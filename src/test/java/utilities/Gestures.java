@@ -43,66 +43,6 @@ public class Gestures {
         getDriver().perform(List.of(sequence));
     }
 
-    public static void longTap(WebElement element) {
-        final var pointCenter = getCenterPoint(element);
-        final var sequence = new Sequence(finger, 1);
-
-        Logs.debug("Move finger to element");
-        sequence.addAction(
-                finger.createPointerMove(
-                        Duration.ofMillis(1000),
-                        PointerInput.Origin.viewport(),
-                        pointCenter
-                )
-        );
-
-        Logs.debug("Press finger to element");
-        sequence.addAction(finger.createPointerDown(PointerInput.MouseButton.LEFT.asArg()));
-
-        Logs.debug("Hold finger 3.5s");
-        sequence.addAction(new Pause(finger, Duration.ofMillis(2500)));
-
-        Logs.debug("Release finger from element");
-        sequence.addAction(finger.createPointerUp(PointerInput.MouseButton.LEFT.asArg()));
-
-        Logs.debug("Perform action");
-        getDriver().perform(List.of(sequence));
-    }
-
-    public static void doubleTap(WebElement element) {
-        final var pointCenter = getCenterPoint(element);
-        final var sequence = new Sequence(finger, 1);
-
-        Logs.debug("Move finger to element");
-        sequence.addAction(
-                finger.createPointerMove(
-                        Duration.ofMillis(1000),
-                        PointerInput.Origin.viewport(),
-                        pointCenter
-                )
-        );
-
-        Logs.debug("Executing double tap");
-        for (int i = 0; i < 2; i++) {
-            sequence.addAction(finger.createPointerMove(
-                    Duration.ZERO,
-                    PointerInput.Origin.viewport(),
-                    pointCenter
-            ));
-            sequence.addAction(finger.createPointerDown(PointerInput.MouseButton.LEFT.asArg()));
-            sequence.addAction(new Pause(finger, Duration.ofMillis(80))); // Toque rápido
-            sequence.addAction(finger.createPointerUp(PointerInput.MouseButton.LEFT.asArg()));
-
-            if (i == 0) {
-                // Pausa mínima entre toques (para que se detecte como doble tap)
-                sequence.addAction(new Pause(finger, Duration.ofMillis(100)));
-            }
-        }
-
-        Logs.debug("Perform action");
-        getDriver().perform(List.of(sequence));
-    }
-
     public static void dragTo(WebElement origin, WebElement destiny) {
         final var originPointCenter = getCenterPoint(origin);
         final var destinyPointCenter = getCenterPoint(destiny);

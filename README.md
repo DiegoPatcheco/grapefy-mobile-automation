@@ -45,10 +45,9 @@ src/
 │       └── log4j2.xml              # logging configuration
 └── test/
     ├── java/
-    │   ├── data/                   # ExcelReader, JsonReader
     │   ├── hooks/                  # Cucumber lifecycle hooks (Hooks.java)
     │   ├── main/                   # RunTests — JUnit Platform Cucumber suite entry point
-    │   ├── models/                 # User, LoginCredential, SignUpCredential
+    │   ├── models/                 # User — generates randomized login credentials via javafaker
     │   ├── pages/                  # Page Objects (one per app screen)
     │   ├── steps/                  # Step definitions (one class per feature)
     │   └── utilities/              # BasePage, DriverManager, DriverProvider,
@@ -56,7 +55,6 @@ src/
     │                                # FileManager, Logs
     └── resources/
         ├── apk/                    # wdioAPP.apk (app under test)
-        ├── data/                   # registerErrorData.xlsx, loginErrorData.json
         └── features/                # Login, Home, Forms, Swipe, WebView, Drag
 ```
 
