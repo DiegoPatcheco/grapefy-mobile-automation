@@ -27,7 +27,7 @@ framework: cucumber
 source: cucumber:appium-intellij:v1.1.6
 
 app: bs://a56592460559411ef05872a72ecdb777b6ba2082
-# app: ./LocalSample.apk #For running local tests
+# app: ./src/test/resources/apk/wdioAPP.apk #For running local tests
 
 # =======================================
 # Platforms (Browsers / Devices to test)
