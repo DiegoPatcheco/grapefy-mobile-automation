@@ -25,7 +25,19 @@ public class DriverManager {
 
     public void killDriver() {
         Logs.debug("Killing driver");
-        new DriverProvider().get().quit();
+
+        final var driverProvider = new DriverProvider();
+        final var driver = driverProvider.get();
+
+        try {
+            if (driver != null) {
+                driver.quit();
+            }
+        } catch (RuntimeException runtimeException) {
+            Logs.error("Failed to quit the driver cleanly: %s", runtimeException.getLocalizedMessage());
+        } finally {
+            driverProvider.remove();
+        }
     }
 
     private void buildLocalDriver() {

@@ -6,6 +6,7 @@ import io.cucumber.java.Before;
 import io.cucumber.java.BeforeAll;
 import io.cucumber.java.Scenario;
 import utilities.DriverManager;
+import utilities.DriverProvider;
 import utilities.FileManager;
 import utilities.Logs;
 
@@ -32,14 +33,34 @@ public class Hooks {
     @After
     public static void after(Scenario scenario) {
         Logs.info("after: %s, status: %s", scenario.getName(), scenario.getStatus());
-        switch (scenario.getStatus()) {
-            case SKIPPED, FAILED -> {
-                FileManager.getScreenshot(scenario.getName());
-                FileManager.getPageSource(scenario.getName());
-                FileManager.attachScreenshot(scenario);
-                FileManager.attachPageSource(scenario);
+        try {
+            switch (scenario.getStatus()) {
+                case SKIPPED, FAILED -> captureEvidence(scenario);
             }
+        } finally {
+            driverManager.killDriver();
         }
-        driverManager.killDriver();
+    }
+
+    private static void captureEvidence(Scenario scenario) {
+        if (new DriverProvider().get() == null) {
+            Logs.warning("Skipping evidence capture for %s: no driver is available, driver initialization may not have completed.",
+                    scenario.getName());
+            return;
+        }
+
+        try {
+            FileManager.getScreenshot(scenario.getName());
+            FileManager.attachScreenshot(scenario);
+        } catch (RuntimeException runtimeException) {
+            Logs.error("Failed to capture screenshot for %s: %s", scenario.getName(), runtimeException.getLocalizedMessage());
+        }
+
+        try {
+            FileManager.getPageSource(scenario.getName());
+            FileManager.attachPageSource(scenario);
+        } catch (RuntimeException runtimeException) {
+            Logs.error("Failed to capture page source for %s: %s", scenario.getName(), runtimeException.getLocalizedMessage());
+        }
     }
 }
