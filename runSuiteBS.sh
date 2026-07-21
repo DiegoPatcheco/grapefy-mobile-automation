@@ -3,4 +3,4 @@ if [ -z "$BROWSERSTACK_USERNAME" ] || [ -z "$BROWSERSTACK_ACCESS_KEY" ]; then
   exit 1
 fi
 
-./mvnw clean test -Dgroups="regression" -DRUN_ON_BROWSERSTACK=true
+./mvnw clean verify -Dgroups="regression" -DRUN_ON_BROWSERSTACK=true

@@ -25,6 +25,10 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.2</version>
                 <configuration>
+                    <!-- Must stay true: this lets the build continue past the `test` phase into
+                         `verify` even when scenarios fail, so surefire/cucumber report artifacts
+                         are generated before net.masterthought:maven-cucumber-reporting's
+                         checkBuildResult=true (below) fails the build for real. -->
                     <testFailureIgnore>true</testFailureIgnore>
                     <argLine>-javaagent:${project.build.directory}/browserstack-java-sdk.jar</argLine>
                     <properties>
@@ -40,7 +44,9 @@
                 <executions>
                     <execution>
                         <id>execution</id>
-                        <phase>test</phase>
+                        <!-- Bound to verify (after test) so this always runs and writes the HTML
+                             report before checkBuildResult below can fail the build. -->
+                        <phase>verify</phase>
                         <goals>
                             <goal>generate</goal>
                         </goals>
@@ -60,8 +66,8 @@
                             <mergeFeaturesById>false</mergeFeaturesById>
                             <!-- optional, set true to get a final report with latest results of the same test from different test runs -->
                             <mergeFeaturesWithRetest>false</mergeFeaturesWithRetest>
-                            <!-- optional, set true to fail build on test failures -->
-                            <checkBuildResult>false</checkBuildResult>
+                            <!-- set true to fail the build (after the report is written) when any scenario failed -->
+                            <checkBuildResult>true</checkBuildResult>
                         </configuration>
                     </execution>
                 </executions>
