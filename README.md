@@ -1,138 +1,201 @@
-# Grapefy-Appium_SkillDemo
+# Grapefy — Android Mobile BDD Automation Framework
 
-## Overview
+I created Grapefy around a simple idea: automated tests should help explain product behavior, not make failures harder to understand. This repository is an Android mobile automation framework built with Java, Appium, and Cucumber, structured the way I'd structure a real test suite at work — Page Object Model, thin step definitions, reusable navigation flows, and evidence capture on failure, rather than a pile of scripts that only I can read.
 
-Grapefy-Appium_SkillDemo is a project developed to showcase skills in Java, Appium, BDD, Cucumber, Gherkin, mobile
-automation, and CI/CD integration. It highlights strong capabilities in cross-platform mobile testing, test design
-strategies, and agile collaboration.
+It's meant to demonstrate how I approach mobile test automation: clear separation between test intent (Gherkin), test logic (step definitions), and UI interaction (Page Objects), plus the supporting pieces — driver lifecycle management, reporting, and CI/CD wiring — that turn a test suite into something a team can actually run and trust.
 
-## Features
+## Current scope
 
-- Built using **Appium**, **Gherkin**, and **JUnit5** for mobile BDD automation.
-- Integrated with **Maven Wrapper** for simplified build and dependency management.
-- CI/CD enabled via **Jenkins** for automated execution.
-- Automatically generates detailed reports using **Cucumber Reports**.
-- Includes **Cloud Testing integration with BrowserStack** for remote device execution.
+- **Android automation only.** The driver layer is built around `AndroidDriver` and UiAutomator2; there is no iOS driver, capability path, or XCUITest configuration in this repository.
+- **Local execution** through a locally running Appium server and an Android emulator or physical device.
+- **Remote execution configuration** for BrowserStack (`browserstack.yml`, dedicated run scripts, and a Jenkins pipeline).
+- iOS is not currently implemented. See [Roadmap](#roadmap).
+
+## What this project demonstrates
+
+- Java and Appium Android automation, using the UiAutomator2 automation engine.
+- Cucumber/Gherkin BDD, executed through the JUnit 5 Platform Suite engine (`cucumber-junit-platform-engine`).
+- Page Object Model: an abstract `BasePage` contract (`waitPageToLoad()` / `verifyPage()`) implemented by one Page Object per app screen.
+- Mobile gestures built directly on W3C Actions (`PointerInput`/`Sequence`) — tap, swipe, and drag, used for the puzzle-drag and carousel-swipe scenarios.
+- WebView and native-context handling: switching the Appium session between `NATIVE_APP` and `WEBVIEW_*` contexts to assert on web content rendered inside the app.
+- Reusable utilities: navigation composition (`CommonFlows`), per-scenario driver lifecycle (`DriverManager`/`DriverProvider`), and automatic screenshot + page-source capture on failed or skipped scenarios (`FileManager`, wired through Cucumber hooks).
+- Cucumber HTML reporting via `net.masterthought:maven-cucumber-reporting`.
+- A Jenkins pipeline definition (`JenkinsFile`) configured to run the suite against BrowserStack and publish results.
+- A BrowserStack configuration (`browserstack.yml`) for cloud device execution, with credentials read from environment variables rather than committed to the file.
+
+## Tech stack
+
+- Java 17
+- Appium Java Client 9.4.0
+- Selenium Java 4.29.0
+- Cucumber 7.21.1 (`cucumber-java`, `cucumber-junit-platform-engine`)
+- JUnit 5 (Jupiter + Platform Suite)
+- Maven, via the Maven Wrapper
+- Log4j2 2.24.3
+- `net.masterthought:maven-cucumber-reporting` / `cucumber-reporting`
+- javafaker 1.0.2 (random login credentials for the valid-login scenario)
+- BrowserStack Java SDK 1.30.8
+
+## Project structure
+
+```
+src/
+├── main/
+│   └── resources/
+│       └── log4j2.xml              # logging configuration
+└── test/
+    ├── java/
+    │   ├── data/                   # ExcelReader, JsonReader
+    │   ├── hooks/                  # Cucumber lifecycle hooks (Hooks.java)
+    │   ├── main/                   # RunTests — JUnit Platform Cucumber suite entry point
+    │   ├── models/                 # User, LoginCredential, SignUpCredential
+    │   ├── pages/                  # Page Objects (one per app screen)
+    │   ├── steps/                  # Step definitions (one class per feature)
+    │   └── utilities/              # BasePage, DriverManager, DriverProvider,
+    │                                # CommonFlows, Gestures, ContextManager,
+    │                                # FileManager, Logs
+    └── resources/
+        ├── apk/                    # wdioAPP.apk (app under test)
+        ├── data/                   # registerErrorData.xlsx, loginErrorData.json
+        └── features/                # Login, Home, Forms, Swipe, WebView, Drag
+```
+
+## Test coverage
+
+Six feature files, all tagged `@regression @smoke`:
+
+| Feature | Scenarios |
+|---|---|
+| Login | 3 scenarios + 2 Scenario Outlines (5 and 3 example rows) |
+| Home | 2 scenarios |
+| Forms | 3 scenarios |
+| Swipe | 3 scenarios |
+| WebView | 1 scenario |
+| Drag | 2 scenarios |
+
+One scenario in `Drag.feature` carries an additional `@single` tag, used to run it in isolation locally or remotely.
 
 ## Prerequisites
 
-Make sure to have the following tools and dependencies installed before setting up the project:
+- JDK 17 (developed against Amazon Corretto 17.0.14)
+- [Maven](https://maven.apache.org/install.html) — optional, the Maven Wrapper is included
+- Git
+- A running Appium server
+- An Android emulator or physical device
+- The app under test, `wdioAPP.apk`, already at `src/test/resources/apk/`
 
-- [Amazon Corretto JDK 17.0.14](https://aws.amazon.com/corretto/)
-- [Maven](https://maven.apache.org/install.html) *(optional if using Maven Wrapper)*
-- [Git](https://git-scm.com/downloads)
-- Appium, Selenium-Java, Cucumber, Cucumber-reporting, and JUnit5 libraries (managed via Maven)
+## Environment variables
 
-## APK Path
+Remote (BrowserStack) execution reads two variables directly from the environment:
 
-- The APK used for testing is located at:
-  ```
-  src/test/resources/apk
-  ```
+```
+BROWSERSTACK_USERNAME
+BROWSERSTACK_ACCESS_KEY
+```
 
-## Appium Server Initialization
+Set them in your shell or CI credential store before running a BrowserStack script — do not put real values in this README, in a committed file, or in a `.env` file checked into the repository.
 
-If you're running this on a new machine, start the Appium server for the first time with:
+## Installation
+
+```sh
+git clone https://github.com/DiegoPatcheco/Grapefy-Appium_SkillDemo.git
+cd Grapefy-Appium_SkillDemo
+./mvnw clean install
+```
+
+Windows users can run `mvnw.cmd` instead of `./mvnw`.
+
+## Local execution
+
+Start the Appium server. First time on a machine:
 
 ```sh
 appium server --allow-insecure chromedriver_autodownload
 ```
 
-On subsequent runs, use:
+Subsequent runs:
 
 ```sh
 appium server
 ```
 
-## Device Setup
+Then start an Android emulator or connect a physical device with `wdioAPP.apk` installed.
 
-Before executing tests:
-
-- Start an Android emulator **or** connect a physical device.
-- Ensure the correct APK is already installed on the device.
-
-## Installation
-
-1. Clone the repository:
-   ```sh
-   git clone https://github.com/DiegoPatcheco/Grapefy-Appium_SkillDemo.git
-   ```
-2. Navigate to the project directory:
-   ```sh
-   cd Grapefy-Appium_SkillDemo
-   ```
-3. Build the project using Maven Wrapper:
-   ```sh
-   ./mvnw clean install
-   ```
-   *(Windows users can use `mvnw.cmd` instead)*
-
-## Running Tests
-
-### Run a Single Test Locally
-
-1. Add the `@single` tag to the desired scenario in the `.feature` file.
-2. Execute the following command:
-   ```sh
-   ./mvnw clean test -Dcucumber.feature="src/test/resources/features" -Dcucumber.filter.tags="@single"
-   ```
-
-### Run the Full Test Suite Locally
-
-Use the following script:
+Run the full local suite:
 
 ```sh
 ./runSuite.sh
 ```
 
-### Run a Single Test Remotely (BrowserStack)
-
-Use the following script:
+which runs:
 
 ```sh
-./runSingleTest.sh
+./mvnw clean verify -Dgroups="regression"
 ```
 
-### Run the Full Suite Remotely (BrowserStack)
-
-Use the following script:
+Run a single scenario: tag it `@single` in its `.feature` file, then:
 
 ```sh
-./runSuiteBS.sh
+./mvnw clean verify -Dcucumber.feature="src/test/resources/features" -Dcucumber.filter.tags="@single"
 ```
 
-## Cucumber Report
+## BrowserStack execution
 
-- The **Cucumber Report** is automatically generated after test execution.
-- To open the report locally:
-  ```sh
-  ./openReport.sh
-  ```
+With `BROWSERSTACK_USERNAME` and `BROWSERSTACK_ACCESS_KEY` already set in your shell:
 
-## CI/CD Integration
+```sh
+./runSuiteBS.sh       # full suite, runs ./mvnw clean verify -Dgroups="regression" -DRUN_ON_BROWSERSTACK=true
+./runSingleTest.sh    # the @single-tagged scenario, same flags plus -DRUN_ON_BROWSERSTACK=true
+```
 
-- Integrated with **GitHub Actions** to automatically run tests on every push or pull request.
-- Also integrated with **Jenkins**, which executes a pipeline using a **GitHub Webhook** triggered on every push to the
-  `main` branch.
-- **ngrok** is used to expose the local Jenkins instance to the internet, enabling GitHub to communicate with Jenkins.
-- Jenkins must be properly configured with the webhook URL, project repository, and required job parameters.
-- Jenkins should have the following plugins installed:
-    - **GitHub integration**
-    - **GitHub Branch Source**
-    - **HTML Publisher**
-    - Plus other recommended plugins for optimal performance.
-- Cucumber reports and test results are uploaded as artifacts and accessible from Jenkins pipeline.
+Both scripts fail fast with a clear error if either variable is missing, rather than attempting a session without credentials.
 
-## Contributing
+## Reporting and build behavior
 
-Contributions are welcome! To contribute:
+- Both the Surefire/JUnit XML results and the Cucumber HTML report are generated during the Maven `verify` phase.
+- All three official scripts (`runSuite.sh`, `runSuiteBS.sh`, `runSingleTest.sh`) invoke `mvn clean verify` and preserve Maven's final exit status — none of them suppress or override it.
+- Surefire is configured to continue past a failing scenario so the reports are actually written, and the Cucumber reporting plugin (`checkBuildResult=true`, bound to `verify`) then fails the build if any scenario failed. A passing run exits `0`; a run with a failed scenario exits non-zero, with both reports still available for inspection.
+- Confirming this end-to-end requires running the suite with a real Appium session against an Android emulator or physical device, including at least one deliberately failing scenario.
 
-1. Fork this repository.
-2. Create a new feature branch.
-3. Commit your changes.
-4. Push your branch and open a pull request.
+## Jenkins pipeline
+
+The `JenkinsFile` at the repository root defines a declarative pipeline that:
+
+- Triggers on a GitHub push webhook.
+- Reads `BROWSERSTACK_USERNAME` and `BROWSERSTACK_ACCESS_KEY` from Jenkins credential bindings, not from hardcoded values.
+- Checks out the repository and runs `./runSuiteBS.sh` against BrowserStack.
+- In a `post { always { ... } }` block, publishes the Surefire/JUnit XML results and the Cucumber HTML report regardless of whether the test stage passed or failed.
+
+This is a pipeline **definition** included in the repository; it requires an actual Jenkins instance with the corresponding job and credentials configured to run.
+
+## Design decisions
+
+- **Page Object Model**: an abstract `BasePage` defines the `waitPageToLoad()` / `verifyPage()` contract; every screen gets its own Page Object implementing it.
+- **Thin step definitions**: step-definition classes parse Gherkin steps and delegate to Page Objects and `CommonFlows`, rather than containing interaction logic themselves.
+- **Per-scenario driver isolation**: `DriverProvider` holds the `AndroidDriver` in a `ThreadLocal`, built fresh by `DriverManager` in a `@Before` hook and torn down in `@After`.
+- **Centralized navigation**: `CommonFlows` composes the home → bottom bar → target-screen sequence once, instead of duplicating navigation across step definitions.
+- **Automatic failure evidence**: the `@After` hook captures a screenshot and the page source on `FAILED`/`SKIPPED` scenarios and attaches both to the Cucumber report.
+- **Gestures as a separate layer**: touch interactions (`Gestures`) are built directly on Selenium's W3C Actions API and kept independent of Page Objects, so any page can reuse them.
+
+## Known limitations
+
+- Android only — no iOS support.
+- Local execution requires a running Appium server and an Android emulator or physical device.
+- Jenkins execution requires an actual Jenkins instance with this pipeline configured.
+- BrowserStack execution requires valid BrowserStack account credentials.
+
+## Roadmap
+
+Possible future work — none of the following is implemented today:
+
+- Real iOS support via XCUITest.
+- A GitHub Actions workflow.
+- Richer failure evidence (video, more detailed captures).
+- Parallel execution across multiple cloud devices.
+- Configurable execution profiles (e.g. per-environment capability sets).
 
 ## Author
 
-Developed by [Diego Patcheco](https://github.com/DiegoPatcheco).
+Diego Pacheco Flores — [github.com/DiegoPatcheco](https://github.com/DiegoPatcheco)
 
+I spend more time thinking about why a test failed than about how green the last run looked — that's the habit this repository is meant to reflect.
