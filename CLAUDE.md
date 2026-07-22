@@ -110,10 +110,20 @@ scenario.
 
 ## CI
 
-`JenkinsFile` at the repo root defines a declarative pipeline: triggers on a GitHub push webhook, reads BrowserStack
-credentials from Jenkins credential bindings, runs `./runSuiteBS.sh`, and in `post { always { ... } }` publishes JUnit
-XML from `target/failsafe-reports/*.xml` and the Cucumber HTML report from `target/cucumber-html-reports/` regardless of
-pass/fail. It requires an actual Jenkins instance with matching job/credentials to execute.
+Three independent execution paths exist. Inspect the actual files under `.github/workflows/` before editing any of
+them — they are the source of truth for triggers, action/tool versions, and steps, not this summary.
+
+- **`static-validation.yml`** (GitHub Actions): runs `mvn clean test-compile` on pull requests to `main`, pushes to
+  `main`, and `workflow_dispatch`. Compiles production and test sources only — no Appium, no emulator, no
+  BrowserStack.
+- **`android-mobile-smoke.yml`** (GitHub Actions): runs on `workflow_dispatch` and on pull requests that modify the
+  workflow file itself (no `push` trigger, no execution on ordinary source/doc PRs). Boots a GitHub-hosted Android
+  emulator, starts Appium locally, and runs only the `@single` scenario through `mvn clean verify` — local execution
+  only, never BrowserStack. Uploads Failsafe/Cucumber/Appium evidence as artifacts.
+- **`JenkinsFile`** (repo root): a declarative Jenkins pipeline definition that triggers on a GitHub push webhook, reads
+  BrowserStack credentials from Jenkins credential bindings, runs `./runSuiteBS.sh`, and in `post { always { ... } }`
+  publishes JUnit XML and the Cucumber HTML report regardless of pass/fail. It requires an actual Jenkins instance
+  with matching job/credentials to execute.
 
 ## Repository guardrails
 
@@ -121,10 +131,16 @@ pass/fail. It requires an actual Jenkins instance with matching job/credentials 
   hardcode or commit them.
 - The `browserstack` Maven profile must never be active for local runs; only invoke it via the documented BrowserStack
   scripts.
-- `maven-failsafe-plugin`'s `integration-test`/`verify` binding remains the authoritative pass/fail gate — do not
-  reintroduce test execution via `maven-surefire-plugin` (kept at `skipTests=true`).
+- `maven-failsafe-plugin`'s `integration-test`/`verify` binding remains the authoritative pass/fail gate in CI as well
+  as local runs — do not reintroduce test execution via `maven-surefire-plugin` (kept at `skipTests=true`).
 - Do not claim or add iOS/XCUITest support — this framework is Android-only.
-- GitHub Actions is not currently implemented; only the Jenkins pipeline (`JenkinsFile`) exists.
+- `static-validation.yml` must stay free of Appium, Android emulator, and BrowserStack execution — it only compiles.
+- `android-mobile-smoke.yml` must stay local-only: no BrowserStack credentials/secrets, no `-Pbrowserstack`, no
+  `RUN_ON_BROWSERSTACK`, and it must keep executing only the `@single` scenario.
+- Workflow artifact-upload steps must keep `if: always()` so Failsafe/Cucumber/Appium evidence is preserved on both
+  pass and fail.
+- Do not broaden either GitHub Actions workflow's trigger scope, and do not change pinned action, Node, Appium, driver,
+  or Android API versions, without explicit approval and a validated run.
 - Avoid hard waits (e.g. `Thread.sleep`) and broad/blanket retries in step definitions or Page Objects — use
   `BasePage`'s explicit-wait helpers instead.
 - Do not change Maven dependencies, plugins, or build lifecycle bindings without explicit approval.
