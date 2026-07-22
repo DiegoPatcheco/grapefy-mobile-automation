@@ -1,0 +1,43 @@
+name: Static Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    name: Compile Java sources
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v5.6.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: pom.xml
+
+      - name: Ensure Maven Wrapper is executable
+        run: chmod +x mvnw
+
+      - name: Compile production and test sources
+        run: ./mvnw --batch-mode --no-transfer-progress clean test-compile
+
+      - name: Verify BrowserStack agent was not activated
+        run: test ! -f target/browserstack-java-sdk.jar
