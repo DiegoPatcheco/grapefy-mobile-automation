@@ -18,6 +18,8 @@ reporting, and CI/CD wiring — that turn a test suite into something a team can
 - **Local execution** through a locally running Appium server and an Android emulator or physical device.
 - **Remote execution configuration** for BrowserStack (`browserstack.yml`, dedicated run scripts, and a Jenkins
   pipeline).
+- **Continuous integration in GitHub Actions**: a static compilation check on pull requests and pushes to `main`, plus
+  an on-demand Android emulator smoke test. See [CI/CD](#cicd).
 - iOS is not currently implemented. See [Roadmap](#roadmap).
 
 ## What this project demonstrates
@@ -37,6 +39,16 @@ reporting, and CI/CD wiring — that turn a test suite into something a team can
 - A Jenkins pipeline definition (`JenkinsFile`) configured to run the suite against BrowserStack and publish results.
 - A BrowserStack configuration (`browserstack.yml`) for cloud device execution, with credentials read from environment
   variables rather than committed to the file.
+- Static CI validation in GitHub Actions: compiling production and test sources on every pull request and push, with
+  no Appium, emulator, or BrowserStack involvement.
+- Android emulator execution in GitHub Actions: booting a real, GitHub-hosted Android emulator to run a Cucumber
+  scenario end to end.
+- Appium server orchestration in CI: starting Appium in the background, polling for readiness, and shutting it down
+  cleanly regardless of the test outcome.
+- Maven Failsafe result propagation: the CI job's pass/fail status comes from the same `integration-test`/`verify`
+  gate used locally, not a separate reporting step.
+- Diagnostic artifact preservation in CI: Failsafe XML, the Cucumber report, the Appium log, and any failure
+  screenshots/page source are uploaded as GitHub Actions artifacts whenever the job runs.
 
 ## Tech stack
 
@@ -54,6 +66,10 @@ reporting, and CI/CD wiring — that turn a test suite into something a team can
 ## Project structure
 
 ```
+.github/
+└── workflows/
+    ├── static-validation.yml      # static compile check (no Appium/emulator)
+    └── android-mobile-smoke.yml   # Android emulator + Appium smoke test
 src/
 ├── main/
 │   └── resources/
@@ -86,7 +102,8 @@ Six feature files, all tagged `@regression @smoke`:
 | WebView | 1 scenario                                               |
 | Drag    | 2 scenarios                                              |
 
-One scenario in `Drag.feature` carries an additional `@single` tag, used to run it in isolation locally or remotely.
+One scenario in `Drag.feature` carries an additional `@single` tag, used to run it in isolation locally, remotely on
+BrowserStack, or via the GitHub Actions Android Mobile Smoke workflow.
 
 ## Prerequisites
 
@@ -184,7 +201,35 @@ a clear error if either credential variable is missing, rather than attempting a
   `target/cucumber-html-reports/overview-features.html`) are written before that final check, so they remain available
   for diagnosis even when the build fails.
 
-## Jenkins pipeline
+## CI/CD
+
+This repository runs verification through two independent paths: GitHub Actions for fast, credential-free automated
+checks, and a Jenkins pipeline definition for full remote execution against BrowserStack.
+
+### GitHub Actions — Static Validation
+
+Path: `.github/workflows/static-validation.yml`
+
+- Triggers on pull requests targeting `main`, on pushes to `main`, and manually via `workflow_dispatch`.
+- Compiles production and test sources with Java 17 (`mvn clean test-compile`) only — it never runs the
+  Cucumber/Appium suite, never starts Appium or an Android emulator, and never activates BrowserStack.
+- Verifies the BrowserStack Java agent jar was not produced, confirming the run stayed local-only.
+
+### GitHub Actions — Android Mobile Smoke
+
+Path: `.github/workflows/android-mobile-smoke.yml`
+
+- Triggers manually via `workflow_dispatch`, and on pull requests targeting `main` only when the workflow file itself
+  changes. It has no `push` trigger and does not run on ordinary source or documentation pull requests.
+- Boots a GitHub-hosted Android emulator, starts a local Appium server with the UiAutomator2 driver, and runs only the
+  existing `@single` scenario (see `Drag.feature`) through the same Maven Failsafe `clean verify` lifecycle used
+  locally — entirely on the emulator, not on BrowserStack.
+- Never activates the `browserstack` Maven profile or `RUN_ON_BROWSERSTACK`, and never references BrowserStack
+  credentials or GitHub secrets.
+- Uploads the Failsafe results, Cucumber report, Appium log, and any failure screenshots/page source as a downloadable
+  artifact whenever the job runs (pass or fail), retained for 7 days.
+
+### Jenkins — BrowserStack Remote Execution
 
 The `JenkinsFile` at the repository root defines a declarative pipeline that:
 
@@ -220,13 +265,17 @@ corresponding job and credentials configured to run.
 - Local execution requires a running Appium server and an Android emulator or physical device.
 - Jenkins execution requires an actual Jenkins instance with this pipeline configured.
 - BrowserStack execution requires valid BrowserStack account credentials.
+- The GitHub Actions Android Mobile Smoke workflow exercises only the `@single` scenario, not the full regression
+  suite.
 
 ## Roadmap
 
 Possible future work — none of the following is implemented today:
 
 - Real iOS support via XCUITest.
-- A GitHub Actions workflow.
+- Scheduled or full-regression execution in GitHub Actions.
+- Android emulator/AVD caching to speed up the Android Mobile Smoke workflow.
+- Broader GitHub Actions smoke coverage beyond the current single `@single` scenario.
 - Richer failure evidence (video, more detailed captures).
 - Parallel execution across multiple cloud devices.
 - Configurable execution profiles (e.g. per-environment capability sets).
