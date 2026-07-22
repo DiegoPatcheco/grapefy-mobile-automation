@@ -10,7 +10,7 @@
 
     <name>Grapefy Android Mobile Automation Framework</name>
     <description>Android mobile BDD automation framework built with Java, Appium and Cucumber.</description>
-    <url>https://github.com/DiegoPatcheco/Grapefy-Appium_SkillDemo</url>
+    <url>https://github.com/DiegoPatcheco/grapefy-mobile-automation</url>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>

@@ -96,8 +96,8 @@ Set them in your shell or CI credential store before running a BrowserStack scri
 ## Installation
 
 ```sh
-git clone https://github.com/DiegoPatcheco/Grapefy-Appium_SkillDemo.git
-cd Grapefy-Appium_SkillDemo
+git clone https://github.com/DiegoPatcheco/grapefy-mobile-automation.git
+cd grapefy-mobile-automation
 ./mvnw clean install
 ```
 
