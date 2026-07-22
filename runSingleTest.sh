@@ -3,4 +3,4 @@ if [ -z "$BROWSERSTACK_USERNAME" ] || [ -z "$BROWSERSTACK_ACCESS_KEY" ]; then
   exit 1
 fi
 
-./mvnw clean verify -Dcucumber.feature="src/test/resources/features" -Dcucumber.filter.tags="@single" -DRUN_ON_BROWSERSTACK=true
+./mvnw clean verify -Pbrowserstack -Dcucumber.feature="src/test/resources/features" -Dcucumber.filter.tags="@single" -DRUN_ON_BROWSERSTACK=true

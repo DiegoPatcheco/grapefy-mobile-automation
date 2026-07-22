@@ -16,6 +16,9 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Empty by default so local execution never loads the BrowserStack SDK javaagent;
+             overridden by the "browserstack" profile below. -->
+        <browserstack.agent.argLine></browserstack.agent.argLine>
     </properties>
 
     <build>
@@ -31,7 +34,7 @@
                          are generated before net.masterthought:maven-cucumber-reporting's
                          checkBuildResult=true (below) fails the build for real. -->
                     <testFailureIgnore>true</testFailureIgnore>
-                    <argLine>-javaagent:${project.build.directory}/browserstack-java-sdk.jar</argLine>
+                    <argLine>${browserstack.agent.argLine}</argLine>
                     <properties>
                         <configurationParameters>cucumber.junit-platform.naming-strategy=long</configurationParameters>
                     </properties>
@@ -82,24 +85,6 @@
                         <goals>
                             <goal>properties</goal>
                         </goals>
-                    </execution>
-                    <execution>
-                        <id>copy-browserstack-sdk</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>copy</goal>
-                        </goals>
-                        <configuration>
-                            <artifactItems>
-                                <artifactItem>
-                                    <groupId>com.browserstack</groupId>
-                                    <artifactId>browserstack-java-sdk</artifactId>
-                                    <version>1.30.8</version>
-                                    <outputDirectory>${project.build.directory}</outputDirectory>
-                                    <destFileName>browserstack-java-sdk.jar</destFileName>
-                                </artifactItem>
-                            </artifactItems>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -177,14 +162,54 @@
             <artifactId>java-client</artifactId>
             <version>9.4.0</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/com.browserstack/browserstack-java-sdk -->
-        <dependency>
-            <groupId>com.browserstack</groupId>
-            <artifactId>browserstack-java-sdk</artifactId>
-            <version>1.30.8</version>
-            <scope>compile</scope>
-        </dependency>
     </dependencies>
 
+    <!-- Activate explicitly with -Pbrowserstack for remote execution. Keeps the BrowserStack
+         SDK dependency, javaagent, and SDK-jar copy out of local-only builds. -->
+    <profiles>
+        <profile>
+            <id>browserstack</id>
+            <properties>
+                <browserstack.agent.argLine>-javaagent:${project.build.directory}/browserstack-java-sdk.jar</browserstack.agent.argLine>
+            </properties>
+            <dependencies>
+                <!-- https://mvnrepository.com/artifact/com.browserstack/browserstack-java-sdk -->
+                <dependency>
+                    <groupId>com.browserstack</groupId>
+                    <artifactId>browserstack-java-sdk</artifactId>
+                    <version>1.30.8</version>
+                    <scope>compile</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <version>3.3.0</version>
+                        <executions>
+                            <execution>
+                                <id>copy-browserstack-sdk</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>copy</goal>
+                                </goals>
+                                <configuration>
+                                    <artifactItems>
+                                        <artifactItem>
+                                            <groupId>com.browserstack</groupId>
+                                            <artifactId>browserstack-java-sdk</artifactId>
+                                            <version>1.30.8</version>
+                                            <outputDirectory>${project.build.directory}</outputDirectory>
+                                            <destFileName>browserstack-java-sdk.jar</destFileName>
+                                        </artifactItem>
+                                    </artifactItems>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>
