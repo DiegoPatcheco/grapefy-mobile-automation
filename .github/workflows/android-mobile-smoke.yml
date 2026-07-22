@@ -1,0 +1,148 @@
+name: Android Mobile Smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/android-mobile-smoke.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-smoke:
+    name: Run @single on Android emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v5.6.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: pom.xml
+
+      - name: Ensure Maven Wrapper is executable
+        run: chmod +x mvnw
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Install Appium and UiAutomator2 driver
+        run: |
+          npm install -g appium@3.5.2
+          appium driver install uiautomator2@4.1.1
+
+      - name: Print tool versions
+        run: |
+          node --version
+          npm --version
+          appium --version
+          appium driver list --installed
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run @single on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2.38.0
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
+          script: |
+            set -euo pipefail
+
+            echo "Confirming the emulator is visible"
+            adb devices
+            adb shell getprop sys.boot_completed
+
+            echo "Starting Appium"
+            appium --address 127.0.0.1 --port 4723 --log appium.log --log-level info &
+            APPIUM_PID=$!
+
+            cleanup() {
+              local exit_code=$?
+
+              # Prevent the explicit exit below from invoking this trap again.
+              trap - EXIT
+
+              # Appium normally exits with SIGTERM, so its process status must not
+              # replace Maven's original result.
+              set +e
+              if kill -0 "$APPIUM_PID" 2>/dev/null; then
+                echo "Stopping Appium (PID $APPIUM_PID)"
+                kill "$APPIUM_PID" 2>/dev/null
+                wait "$APPIUM_PID" 2>/dev/null
+              fi
+              set -e
+
+              exit "$exit_code"
+            }
+            trap cleanup EXIT
+
+            echo "Waiting for Appium to report ready"
+            ready=false
+            for attempt in $(seq 1 30); do
+              if curl -sf http://127.0.0.1:4723/status > /dev/null; then
+                ready=true
+                break
+              fi
+              sleep 2
+            done
+
+            if [ "$ready" != "true" ]; then
+              echo "Appium did not become ready after 30 attempts" >&2
+              exit 1
+            fi
+
+            echo "Running the @single scenario through Failsafe"
+            if ./mvnw --batch-mode --no-transfer-progress clean verify \
+              -Dcucumber.features="src/test/resources/features" \
+              -Dcucumber.filter.tags="@single"; then
+              MAVEN_EXIT_CODE=0
+            else
+              MAVEN_EXIT_CODE=$?
+            fi
+
+            if [ "$MAVEN_EXIT_CODE" -eq 0 ]; then
+              echo "Verifying Failsafe and Cucumber report output"
+              test -d target/failsafe-reports
+              test -f target/cucumber-html-reports/overview-features.html
+              test ! -f target/browserstack-java-sdk.jar
+            fi
+
+            exit "$MAVEN_EXIT_CODE"
+
+      - name: Upload smoke test artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-mobile-smoke-${{ github.run_number }}
+          path: |
+            target/failsafe-reports/
+            target/cucumber/
+            target/cucumber-html-reports/
+            target/screenshots/
+            target/pageStructure/
+            appium.log
+          retention-days: 7
+          if-no-files-found: warn
