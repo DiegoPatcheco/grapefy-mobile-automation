@@ -137,23 +137,26 @@ Run a single scenario: tag it `@single` in its `.feature` file, then:
 ./mvnw clean verify -Dcucumber.feature="src/test/resources/features" -Dcucumber.filter.tags="@single"
 ```
 
+Local runs never activate the `browserstack` Maven profile, so the BrowserStack Java agent is not copied or loaded — local execution only ever talks to the Appium server above.
+
 ## BrowserStack execution
 
 With `BROWSERSTACK_USERNAME` and `BROWSERSTACK_ACCESS_KEY` already set in your shell:
 
 ```sh
-./runSuiteBS.sh       # full suite, runs ./mvnw clean verify -Dgroups="regression" -DRUN_ON_BROWSERSTACK=true
-./runSingleTest.sh    # the @single-tagged scenario, same flags plus -DRUN_ON_BROWSERSTACK=true
+./runSuiteBS.sh       # full suite:   mvn clean verify -Pbrowserstack -Dgroups="regression" -DRUN_ON_BROWSERSTACK=true
+./runSingleTest.sh    # @single only: mvn clean verify -Pbrowserstack -Dcucumber.feature="src/test/resources/features" -Dcucumber.filter.tags="@single" -DRUN_ON_BROWSERSTACK=true
 ```
 
-Both scripts fail fast with a clear error if either variable is missing, rather than attempting a session without credentials.
+Both flags are required for a real BrowserStack run: `-Pbrowserstack` explicitly activates the Maven profile that adds the BrowserStack SDK dependency and attaches its Java agent to the test JVM, while `-DRUN_ON_BROWSERSTACK=true` is the separate runtime flag `DriverManager` reads to build a remote driver instead of a local one. Both scripts fail fast with a clear error if either credential variable is missing, rather than attempting a session without credentials.
 
 ## Reporting and build behavior
 
-- Both the Surefire/JUnit XML results and the Cucumber HTML report are generated during the Maven `verify` phase.
-- All three official scripts (`runSuite.sh`, `runSuiteBS.sh`, `runSingleTest.sh`) invoke `mvn clean verify` and preserve Maven's final exit status — none of them suppress or override it.
-- Surefire is configured to continue past a failing scenario so the reports are actually written, and the Cucumber reporting plugin (`checkBuildResult=true`, bound to `verify`) then fails the build if any scenario failed. A passing run exits `0`; a run with a failed scenario exits non-zero, with both reports still available for inspection.
-- Confirming this end-to-end requires running the suite with a real Appium session against an Android emulator or physical device, including at least one deliberately failing scenario.
+- Mobile Cucumber/Appium scenarios run as integration tests via `maven-failsafe-plugin`, during the `integration-test` phase.
+- The Cucumber HTML report is generated during `post-integration-test`, after the suite has run and before the final result is verified.
+- `failsafe:verify`, bound to the `verify` phase, evaluates the recorded results and fails the build for any assertion failure, `@Before` hook error, or other test error.
+- All three official scripts (`runSuite.sh`, `runSuiteBS.sh`, `runSingleTest.sh`) invoke `mvn clean verify` and preserve Maven's final exit status: a passing run exits `0`; a run with any failure or error exits non-zero.
+- Both the Failsafe XML results (`target/failsafe-reports/`) and the Cucumber HTML report (`target/cucumber-html-reports/overview-features.html`) are written before that final check, so they remain available for diagnosis even when the build fails.
 
 ## Jenkins pipeline
 
@@ -162,7 +165,7 @@ The `JenkinsFile` at the repository root defines a declarative pipeline that:
 - Triggers on a GitHub push webhook.
 - Reads `BROWSERSTACK_USERNAME` and `BROWSERSTACK_ACCESS_KEY` from Jenkins credential bindings, not from hardcoded values.
 - Checks out the repository and runs `./runSuiteBS.sh` against BrowserStack.
-- In a `post { always { ... } }` block, publishes the Surefire/JUnit XML results and the Cucumber HTML report regardless of whether the test stage passed or failed.
+- In a `post { always { ... } }` block, publishes JUnit-compatible XML from `target/failsafe-reports/*.xml` and the Cucumber HTML report from `target/cucumber-html-reports/`, both attempted regardless of whether the test stage passed or failed.
 
 This is a pipeline **definition** included in the repository; it requires an actual Jenkins instance with the corresponding job and credentials configured to run.
 
