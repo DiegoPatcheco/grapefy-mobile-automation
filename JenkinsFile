@@ -41,7 +41,7 @@ pipeline {
     post {
         always {
             junit(
-                testResults: 'target/surefire-reports/*.xml',
+                testResults: 'target/failsafe-reports/*.xml',
                 allowEmptyResults: true
             )
             publishHTML([
