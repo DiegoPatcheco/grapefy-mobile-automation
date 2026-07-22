@@ -12,4 +12,8 @@ public class DriverProvider {
     public AndroidDriver get() {
         return threadLocal.get();
     }
+
+    public void remove() {
+        threadLocal.remove();
+    }
 }

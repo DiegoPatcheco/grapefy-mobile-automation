@@ -9,6 +9,7 @@ import org.openqa.selenium.TakesScreenshot;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
 
 public class FileManager {
     private static final String screenshotPath = "target/screenshots";
@@ -42,22 +43,28 @@ public class FileManager {
 
     public static void getPageSource(String fileName) {
         Logs.debug("Taking the page source");
-        final var path = String.format("%s/%s", pageStructurePath, fileName);
+
+        final var safeFileName = sanitizeFileName(fileName) + "_" + System.currentTimeMillis();
+        final var path = String.format("%s/%s", pageStructurePath, safeFileName);
+        final var file = new File(path);
 
         try {
-            final var file = new File(path);
+            Files.createDirectories(file.getParentFile().toPath());
 
-            if (file.getParentFile().mkdirs()) {
-                final var fileWriter = new FileWriter(file);
-                final var pageSource = new DriverProvider().get().getPageSource();
-                if (pageSource != null) {
+            final var pageSource = new DriverProvider().get().getPageSource();
+            if (pageSource != null) {
+                try (var fileWriter = new FileWriter(file)) {
                     fileWriter.write(Jsoup.parse(pageSource).toString());
                 }
-                fileWriter.close();
             }
         } catch (IOException ioException) {
-            throw new RuntimeException(ioException.getLocalizedMessage());
+            Logs.error("Failed to write page source to %s: %s", path, ioException.getLocalizedMessage());
+            throw new RuntimeException("Failed to write page source to " + path, ioException);
         }
+    }
+
+    private static String sanitizeFileName(String fileName) {
+        return fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
     }
 
     public static void attachPageSource(Scenario scenario) {

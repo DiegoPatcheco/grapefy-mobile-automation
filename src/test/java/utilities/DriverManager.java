@@ -25,7 +25,19 @@ public class DriverManager {
 
     public void killDriver() {
         Logs.debug("Killing driver");
-        new DriverProvider().get().quit();
+
+        final var driverProvider = new DriverProvider();
+        final var driver = driverProvider.get();
+
+        try {
+            if (driver != null) {
+                driver.quit();
+            }
+        } catch (RuntimeException runtimeException) {
+            Logs.error("Failed to quit the driver cleanly: %s", runtimeException.getLocalizedMessage());
+        } finally {
+            driverProvider.remove();
+        }
     }
 
     private void buildLocalDriver() {
@@ -75,6 +87,15 @@ public class DriverManager {
     private static MutableCapabilities getMutableRemoteCapabilities() {
         final var mutableCapabilities = new MutableCapabilities();
 
+        final var userName = System.getenv("BROWSERSTACK_USERNAME");
+        final var accessKey = System.getenv("BROWSERSTACK_ACCESS_KEY");
+
+        if (userName == null || userName.isBlank() || accessKey == null || accessKey.isBlank()) {
+            throw new IllegalStateException(
+                    "Remote execution requires the BROWSERSTACK_USERNAME and BROWSERSTACK_ACCESS_KEY "
+                            + "environment variables to be set.");
+        }
+
         HashMap<String, String> bstackOptions = new HashMap<>();
         bstackOptions.putIfAbsent("source", "cucumber:appium-intellij:v1.1.6");
         bstackOptions.putIfAbsent("deviceName", "Samsung Galaxy S22 Ultra");
@@ -83,8 +104,8 @@ public class DriverManager {
         bstackOptions.putIfAbsent("projectName", "Grapefy");
         bstackOptions.putIfAbsent("buildName", "run-suite build");
         bstackOptions.putIfAbsent("appium:app", "bs://a56592460559411ef05872a72ecdb777b6ba2082");
-        bstackOptions.putIfAbsent("userName", "diegopachecoflor_fUsoOk");
-        bstackOptions.putIfAbsent("accessKey", "zGMpYr27qyMXBwGyTz1Z");
+        bstackOptions.putIfAbsent("userName", userName);
+        bstackOptions.putIfAbsent("accessKey", accessKey);
 
         return mutableCapabilities;
     }

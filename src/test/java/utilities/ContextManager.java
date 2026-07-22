@@ -8,24 +8,28 @@ public class ContextManager {
     }
 
     public static void switchWebViewContext() {
-        final var driver = getDriver();
-        final var contextSet = driver.getContextHandles();
-
-        for (var context : contextSet) {
-            if (context.contains("WEBVIEW")) {
-                driver.context(context);
-            }
-        }
+        switchToContextContaining("WEBVIEW");
     }
 
     public static void switchNativeAppContext() {
+        switchToContextContaining("NATIVE_APP");
+    }
+
+    private static void switchToContextContaining(String identifier) {
         final var driver = getDriver();
         final var contextSet = driver.getContextHandles();
 
         for (var context : contextSet) {
-            if (context.contains("NATIVE_APP")) {
+            if (context.contains(identifier)) {
                 driver.context(context);
+                return;
             }
         }
+
+        final var message = String.format(
+                "No Appium context containing \"%s\" was found. Available contexts: %s",
+                identifier, contextSet);
+        Logs.error(message);
+        throw new IllegalStateException(message);
     }
 }

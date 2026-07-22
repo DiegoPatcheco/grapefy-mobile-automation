@@ -40,11 +40,15 @@ pipeline {
 
     post {
         always {
+            junit(
+                testResults: 'target/failsafe-reports/*.xml',
+                allowEmptyResults: true
+            )
             publishHTML([
                 reportDir: 'target/cucumber-html-reports',
                 reportFiles: 'overview-features.html',
                 reportName: 'Cucumber Test Report',
-                allowMissing: false,
+                allowMissing: true,
                 keepAll: true,
                 alwaysLinkToLastBuild: true
             ])

@@ -1,3 +1,6 @@
-export BROWSERSTACK_USERNAME=diegopachecoflor_fUsoOk
-export BROWSERSTACK_ACCESS_KEY=zGMpYr27qyMXBwGyTz1Z
-./mvnw clean test -Dgroups="regression" -DRUN_ON_BROWSERSTACK=true
+if [ -z "$BROWSERSTACK_USERNAME" ] || [ -z "$BROWSERSTACK_ACCESS_KEY" ]; then
+  echo "Error: BROWSERSTACK_USERNAME and BROWSERSTACK_ACCESS_KEY must be set in the environment." >&2
+  exit 1
+fi
+
+./mvnw clean verify -Pbrowserstack -Dgroups="regression" -DRUN_ON_BROWSERSTACK=true

@@ -3,18 +3,22 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.example</groupId>
-    <artifactId>Grapefy-Appium_SkillDemo</artifactId>
+    <groupId>io.github.diegopatcheco</groupId>
+    <artifactId>grapefy-mobile-automation</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
-    <name>Grapefy-Appium_SkillDemo</name>
-    <url>http://maven.apache.org</url>
+    <name>Grapefy Android Mobile Automation Framework</name>
+    <description>Android mobile BDD automation framework built with Java, Appium and Cucumber.</description>
+    <url>https://github.com/DiegoPatcheco/grapefy-mobile-automation</url>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Empty by default so local execution never loads the BrowserStack SDK javaagent;
+             overridden by the "browserstack" profile below. -->
+        <browserstack.agent.argLine></browserstack.agent.argLine>
     </properties>
 
     <build>
@@ -25,12 +29,44 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.2</version>
                 <configuration>
-                    <testFailureIgnore>true</testFailureIgnore>
-                    <argLine>-javaagent:${project.build.directory}/browserstack-java-sdk.jar</argLine>
+                    <!-- All test execution now runs via maven-failsafe-plugin (integration-test /
+                         verify, below) so failures produce a real, non-zero Maven exit code.
+                         RunTests.java matches Surefire's default *Tests.java inclusion pattern, so
+                         it is skipped here to avoid running the whole Cucumber suite a second time
+                         during the `test` phase. -->
+                    <skipTests>true</skipTests>
+                </configuration>
+            </plugin>
+            <!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-failsafe-plugin -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.5.2</version>
+                <configuration>
+                    <!-- RunTests.java doesn't match Failsafe's default IT*/*IT/*ITCase naming
+                         convention, so it must be included explicitly. -->
+                    <includes>
+                        <include>**/RunTests.java</include>
+                    </includes>
+                    <argLine>${browserstack.agent.argLine}</argLine>
                     <properties>
                         <configurationParameters>cucumber.junit-platform.naming-strategy=long</configurationParameters>
                     </properties>
                 </configuration>
+                <executions>
+                    <execution>
+                        <!-- integration-test: runs the suite and records results in
+                             target/failsafe-reports/failsafe-summary.xml without failing the build.
+                             verify: reads that summary and fails the build for any failure or
+                             error, including @Before hook/setup errors, after both the
+                             Surefire/Failsafe-style XML and the Cucumber HTML report (below) have
+                             already been written. -->
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <!-- https://mvnrepository.com/artifact/net.masterthought/maven-cucumber-reporting -->
             <plugin>
@@ -40,12 +76,16 @@
                 <executions>
                     <execution>
                         <id>execution</id>
-                        <phase>test</phase>
+                        <!-- Bound to post-integration-test: after failsafe:integration-test writes
+                             the Cucumber JSON, before failsafe:verify (above) evaluates results in
+                             verify. Guarantees the HTML report exists regardless of whether the
+                             build ultimately fails. -->
+                        <phase>post-integration-test</phase>
                         <goals>
                             <goal>generate</goal>
                         </goals>
                         <configuration>
-                            <projectName>cucumber-jvm-example</projectName>
+                            <projectName>Grapefy</projectName>
                             <!-- optional, per documentation set this to "true" to bypass generation of Cucumber Reports entirely, defaults to false if not specified -->
                             <skip>false</skip>
                             <!-- output directory for the generated report -->
@@ -60,8 +100,10 @@
                             <mergeFeaturesById>false</mergeFeaturesById>
                             <!-- optional, set true to get a final report with latest results of the same test from different test runs -->
                             <mergeFeaturesWithRetest>false</mergeFeaturesWithRetest>
-                            <!-- optional, set true to fail build on test failures -->
-                            <checkBuildResult>false</checkBuildResult>
+                            <!-- Secondary signal only now: maven-failsafe-plugin:verify (above) is
+                                 the authoritative, reliable gate, since checkBuildResult's JSON-based
+                                 status parsing was verified not to detect @Before hook/setup errors. -->
+                            <checkBuildResult>true</checkBuildResult>
                         </configuration>
                     </execution>
                 </executions>
@@ -75,24 +117,6 @@
                         <goals>
                             <goal>properties</goal>
                         </goals>
-                    </execution>
-                    <execution>
-                        <id>copy-browserstack-sdk</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>copy</goal>
-                        </goals>
-                        <configuration>
-                            <artifactItems>
-                                <artifactItem>
-                                    <groupId>com.browserstack</groupId>
-                                    <artifactId>browserstack-java-sdk</artifactId>
-                                    <version>1.30.8</version>
-                                    <outputDirectory>${project.build.directory}</outputDirectory>
-                                    <destFileName>browserstack-java-sdk.jar</destFileName>
-                                </artifactItem>
-                            </artifactItems>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -152,23 +176,11 @@
             <artifactId>log4j-api</artifactId>
             <version>2.24.3</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/com.github.ozlerhakan/poiji -->
-        <dependency>
-            <groupId>com.github.ozlerhakan</groupId>
-            <artifactId>poiji</artifactId>
-            <version>4.7.0</version>
-        </dependency>
         <!-- https://mvnrepository.com/artifact/com.github.javafaker/javafaker -->
         <dependency>
             <groupId>com.github.javafaker</groupId>
             <artifactId>javafaker</artifactId>
             <version>1.0.2</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.18.3</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.seleniumhq.selenium/selenium-java -->
         <dependency>
@@ -182,14 +194,54 @@
             <artifactId>java-client</artifactId>
             <version>9.4.0</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/com.browserstack/browserstack-java-sdk -->
-        <dependency>
-            <groupId>com.browserstack</groupId>
-            <artifactId>browserstack-java-sdk</artifactId>
-            <version>1.30.8</version>
-            <scope>compile</scope>
-        </dependency>
     </dependencies>
 
+    <!-- Activate explicitly with -Pbrowserstack for remote execution. Keeps the BrowserStack
+         SDK dependency, javaagent, and SDK-jar copy out of local-only builds. -->
+    <profiles>
+        <profile>
+            <id>browserstack</id>
+            <properties>
+                <browserstack.agent.argLine>-javaagent:${project.build.directory}/browserstack-java-sdk.jar</browserstack.agent.argLine>
+            </properties>
+            <dependencies>
+                <!-- https://mvnrepository.com/artifact/com.browserstack/browserstack-java-sdk -->
+                <dependency>
+                    <groupId>com.browserstack</groupId>
+                    <artifactId>browserstack-java-sdk</artifactId>
+                    <version>1.30.8</version>
+                    <scope>compile</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <version>3.3.0</version>
+                        <executions>
+                            <execution>
+                                <id>copy-browserstack-sdk</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>copy</goal>
+                                </goals>
+                                <configuration>
+                                    <artifactItems>
+                                        <artifactItem>
+                                            <groupId>com.browserstack</groupId>
+                                            <artifactId>browserstack-java-sdk</artifactId>
+                                            <version>1.30.8</version>
+                                            <outputDirectory>${project.build.directory}</outputDirectory>
+                                            <destFileName>browserstack-java-sdk.jar</destFileName>
+                                        </artifactItem>
+                                    </artifactItems>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>
