@@ -58,6 +58,77 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      - name: Prepare Android smoke script
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/android-mobile-smoke.sh" <<'BASH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          echo "Confirming the emulator is visible"
+          adb devices
+          adb shell getprop sys.boot_completed
+
+          echo "Starting Appium"
+          appium --address 127.0.0.1 --port 4723 --log appium.log --log-level info &
+          APPIUM_PID=$!
+
+          cleanup() {
+            local exit_code=$?
+
+            # Prevent the explicit exit below from invoking this trap again.
+            trap - EXIT
+
+            # Appium normally exits with SIGTERM, so its process status must not
+            # replace Maven's original result.
+            set +e
+            if kill -0 "$APPIUM_PID" 2>/dev/null; then
+              echo "Stopping Appium (PID $APPIUM_PID)"
+              kill "$APPIUM_PID" 2>/dev/null
+              wait "$APPIUM_PID" 2>/dev/null
+            fi
+            set -e
+
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+
+          echo "Waiting for Appium to report ready"
+          ready=false
+          for attempt in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:4723/status > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+
+          if [ "$ready" != "true" ]; then
+            echo "Appium did not become ready after 30 attempts" >&2
+            exit 1
+          fi
+
+          echo "Running the @single scenario through Failsafe"
+          if ./mvnw --batch-mode --no-transfer-progress clean verify \
+            -Dcucumber.features="src/test/resources/features" \
+            -Dcucumber.filter.tags="@single"; then
+            MAVEN_EXIT_CODE=0
+          else
+            MAVEN_EXIT_CODE=$?
+          fi
+
+          if [ "$MAVEN_EXIT_CODE" -eq 0 ]; then
+            echo "Verifying Failsafe and Cucumber report output"
+            test -d target/failsafe-reports
+            test -f target/cucumber-html-reports/overview-features.html
+            test ! -f target/browserstack-java-sdk.jar
+          fi
+
+          exit "$MAVEN_EXIT_CODE"
+          BASH
+
+          chmod +x "$RUNNER_TEMP/android-mobile-smoke.sh"
+
       - name: Run @single on Android emulator
         uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
@@ -68,71 +139,7 @@ jobs:
           disable-animations: true
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
-          script: |
-            bash <<'BASH'
-            set -euo pipefail
-
-            echo "Confirming the emulator is visible"
-            adb devices
-            adb shell getprop sys.boot_completed
-
-            echo "Starting Appium"
-            appium --address 127.0.0.1 --port 4723 --log appium.log --log-level info &
-            APPIUM_PID=$!
-
-            cleanup() {
-              local exit_code=$?
-
-              # Prevent the explicit exit below from invoking this trap again.
-              trap - EXIT
-
-              # Appium normally exits with SIGTERM, so its process status must not
-              # replace Maven's original result.
-              set +e
-              if kill -0 "$APPIUM_PID" 2>/dev/null; then
-                echo "Stopping Appium (PID $APPIUM_PID)"
-                kill "$APPIUM_PID" 2>/dev/null
-                wait "$APPIUM_PID" 2>/dev/null
-              fi
-              set -e
-
-              exit "$exit_code"
-            }
-            trap cleanup EXIT
-
-            echo "Waiting for Appium to report ready"
-            ready=false
-            for attempt in $(seq 1 30); do
-              if curl -sf http://127.0.0.1:4723/status > /dev/null; then
-                ready=true
-                break
-              fi
-              sleep 2
-            done
-
-            if [ "$ready" != "true" ]; then
-              echo "Appium did not become ready after 30 attempts" >&2
-              exit 1
-            fi
-
-            echo "Running the @single scenario through Failsafe"
-            if ./mvnw --batch-mode --no-transfer-progress clean verify \
-              -Dcucumber.features="src/test/resources/features" \
-              -Dcucumber.filter.tags="@single"; then
-              MAVEN_EXIT_CODE=0
-            else
-              MAVEN_EXIT_CODE=$?
-            fi
-
-            if [ "$MAVEN_EXIT_CODE" -eq 0 ]; then
-              echo "Verifying Failsafe and Cucumber report output"
-              test -d target/failsafe-reports
-              test -f target/cucumber-html-reports/overview-features.html
-              test ! -f target/browserstack-java-sdk.jar
-            fi
-
-            exit "$MAVEN_EXIT_CODE"
-            BASH
+          script: bash "$RUNNER_TEMP/android-mobile-smoke.sh"
 
       - name: Upload smoke test artifacts
         if: always()
