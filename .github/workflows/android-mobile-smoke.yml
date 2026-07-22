@@ -69,6 +69,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
           script: |
+            bash <<'BASH'
             set -euo pipefail
 
             echo "Confirming the emulator is visible"
@@ -131,6 +132,7 @@ jobs:
             fi
 
             exit "$MAVEN_EXIT_CODE"
+            BASH
 
       - name: Upload smoke test artifacts
         if: always()
